@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: smartlapor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smartlapor
+      POSTGRES_USER: smartlapor
+      POSTGRES_PASSWORD: smartlapor
+    ports:
+      - "5432:5432"
+    volumes:
+      - smartlapor_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartlapor -d smartlapor"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: smartlapor-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://smartlapor:smartlapor@db:5432/smartlapor
+      JWT_SECRET: smartlapor-docker-dev-secret-change-before-production-2026
+      FRONTEND_URL: http://localhost:5173
+      API_PORT: 8080
+      UPLOAD_DIR: /app/uploads
+      SEED_DEV: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - smartlapor_uploads:/app/uploads
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080/api/v1
+    container_name: smartlapor-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  smartlapor_pgdata:
+  smartlapor_uploads:
